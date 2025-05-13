@@ -1,0 +1,12 @@
+specVersion: "v1"
+serviceId: "book-tok"
+location: "us-central1"
+schema:
+  source: "./schema"
+  datasource:
+    postgresql:
+      database: "fdcdb"
+      cloudSql:
+        instanceId: "book-tok-fdc"
+      # schemaValidation: "COMPATIBLE"
+connectorDirs: ["./connector"]

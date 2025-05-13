@@ -1,0 +1,331 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Modern Instagram-inspired color scheme with bookish accents */
+  --background: #fafafa; /* Instagram's light background */
+  --foreground: #262626; /* Instagram's text color */
+  --card-bg: #ffffff;
+  --card-border: #efefef; /* Instagram's subtle border */
+  --primary-color: #8c6f4b; /* Leather brown primary - our brand color */
+  --primary-light: #f5f0e8; /* Lighter brand accent for better contrast */
+  --primary-dark: #5e4a32; /* Dark brand accent */
+  --accent-color: #bf4d28; /* Bookbinding red accent - our secondary brand color */
+  --accent-light: #f2d5c8; /* Light accent */
+  --nav-color: #ffffff; /* Instagram's white navigation */
+  --feed-width: 470px;
+  --nav-height: 60px;
+  --story-gradient: linear-gradient(45deg, #8c6f4b, #bf4d28); /* Our branded story circle */
+  --book-spine-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+  --page-curl: radial-gradient(circle at bottom right, transparent 12px, var(--card-bg) 13px);
+  
+  /* Instagram-like gradients */
+  --ig-gradient-1: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+  --ig-gradient-2: linear-gradient(45deg, #405de6, #5851db, #833ab4, #c13584, #e1306c, #fd1d1d);
+  --brand-gradient: linear-gradient(45deg, var(--primary-color), var(--accent-color));
+}
+
+[data-theme='dark'] {
+  --background: #121212; /* Instagram dark mode background */
+  --foreground: #f0ebe2; /* Light text for dark mode */
+  --card-bg: #1e1e1e; /* Instagram card background in dark mode */
+  --card-border: #333333; /* Dark mode border */
+  --primary-color: #c09e6b; /* Gold leaf primary */
+  --primary-light: #3d3426; /* Dark accent */
+  --primary-dark: #d4b483; /* Light gold */
+  --accent-color: #c25c3d; /* Vibrant book accent */
+  --accent-light: #492d25; /* Dark accent */
+  --nav-color: #1e1e1e; /* Dark navigation */
+  --book-spine-shadow: 0 2px 15px rgba(0, 0, 0, 0.5);
+}
+
+@layer base {
+  body {
+    @apply text-[var(--foreground)] bg-[var(--background)] overflow-x-hidden;
+    font-family: 'Segoe UI', 'Helvetica', 'Arial', sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif font-bold;
+    font-family: 'Palatino', 'Book Antiqua', serif;
+  }
+  a {
+    @apply transition-colors duration-200;
+  }
+}
+
+@layer components {
+  /* Instagram-like buttons without the page-turn effect */
+  .btn-primary {
+    @apply bg-[var(--primary-color)] hover:bg-[var(--primary-dark)] text-white font-medium py-2 px-6 shadow-sm transition-all duration-300 rounded-md;
+  }
+  
+  .btn-secondary {
+    @apply bg-white border border-[var(--card-border)] hover:bg-[var(--primary-light)] text-[var(--primary-dark)] dark:bg-[var(--card-bg)] dark:border-[var(--card-border)] dark:text-[var(--primary-color)] font-medium py-2 px-6 shadow-sm transition-all duration-300 rounded-md;
+  }
+  
+  /* Instagram-like card styling */
+  .card {
+    @apply bg-[var(--card-bg)] border border-[var(--card-border)] p-4 transition-all duration-300 rounded-lg;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  
+  .input {
+    @apply border border-[var(--card-border)] bg-white dark:bg-[var(--card-bg)] dark:text-[var(--foreground)] p-2 w-full outline-none rounded-md;
+    box-shadow: inset 1px 1px 3px rgba(0,0,0,0.02);
+  }
+  
+  .input:focus {
+    @apply border-[var(--accent-color)];
+    box-shadow: inset 1px 1px 3px rgba(0,0,0,0.02), 0 0 0 1px var(--accent-light);
+  }
+  
+  /* Instagram-like Bottom Nav */
+  .mobile-nav-bar {
+    @apply fixed bottom-0 left-0 right-0 bg-[var(--nav-color)] border-t border-[var(--card-border)] flex justify-around py-2 md:hidden z-50;
+    box-shadow: 0 -1px 5px rgba(0,0,0,0.05);
+  }
+  
+  .mobile-nav-item {
+    @apply flex flex-col items-center justify-center py-1 px-3 text-[var(--foreground)] hover:text-[var(--accent-color)];
+    transition: transform 0.2s ease-in-out;
+  }
+  
+  .mobile-nav-item:active {
+    transform: scale(0.95);
+  }
+  
+  /* Instagram-like Feed Card */
+  .feed-card {
+    @apply bg-[var(--card-bg)] border border-[var(--card-border)] mb-3 max-w-[var(--feed-width)] mx-auto transition-all duration-300 rounded-lg overflow-hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  
+  .feed-card-header {
+    @apply flex items-center p-3 border-b border-[var(--card-border)];
+  }
+  
+  .feed-card-content {
+    @apply relative;
+  }
+  
+  .feed-card-actions {
+    @apply flex justify-between px-4 py-2;
+  }
+  
+  .feed-card-description {
+    @apply px-4 py-2;
+  }
+  
+  /* Custom fade in animation */
+  .fade-in {
+    @apply animate-fadeIn;
+  }
+  
+  /* Instagram-like Story Circle */
+  .story-circle {
+    @apply relative cursor-pointer;
+    border-radius: 50%;
+    padding: 2px;
+    background: var(--story-gradient);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  }
+  
+  .story-circle-inner {
+    @apply bg-[var(--card-bg)] rounded-full p-0.5;
+  }
+  
+  /* Action Button - Like, Comment, Share */
+  .action-btn {
+    @apply p-2 rounded-full hover:bg-[var(--primary-light)] dark:hover:bg-[var(--primary-light)] transition-colors;
+  }
+  
+  /* Double Tap Like Animation - Instagram heart */
+  .heart-animation {
+    @apply absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-8xl opacity-0 scale-0 transition-all duration-500 animate-heartBeat z-50;
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+  }
+  
+  /* Spinner Animation - loading */
+  .spinner {
+    @apply h-8 w-8 rounded-full border-2 border-[var(--card-border)] border-t-[var(--accent-color)] animate-spin;
+  }
+
+  /* Instagram-like Navigation menu styles */
+  .main-navigation {
+    @apply bg-[var(--nav-color)] shadow-sm transition-all duration-300 border-b border-[var(--card-border)];
+    backdrop-filter: blur(4px);
+  }
+
+  .nav-link {
+    @apply text-[var(--foreground)] font-normal hover:text-[var(--accent-color)] px-4 py-2 transition-colors duration-200;
+    position: relative;
+  }
+
+  .nav-link.active {
+    @apply text-[var(--accent-color)];
+  }
+
+  /* Create post button with Instagram-like styling */
+  .create-button {
+    @apply bg-[var(--accent-color)] text-white rounded-md p-2 shadow-sm hover:brightness-110 transition-all duration-300;
+  }
+
+  .create-button-large {
+    @apply bg-gradient-to-r from-[var(--primary-color)] to-[var(--accent-color)] text-white rounded-md px-4 py-2 shadow-sm hover:shadow-md transition-all duration-300 font-medium;
+  }
+  
+  /* Instagram-like username display */
+  .username {
+    @apply font-medium text-[var(--foreground)];
+  }
+  
+  /* Instagram-like caption */
+  .caption {
+    @apply text-sm text-[var(--foreground)] leading-snug;
+  }
+  
+  /* Instagram-like timestamp */
+  .timestamp {
+    @apply text-xs text-gray-500 mt-1;
+  }
+  
+  /* Instagram-like like count */
+  .like-count {
+    @apply text-sm font-medium mt-1;
+  }
+  
+  /* Instagram-like comment section */
+  .comments-section {
+    @apply border-t border-[var(--card-border)] mt-2 pt-2 px-4;
+  }
+  
+  /* Instagram-like comment */
+  .comment {
+    @apply flex items-start space-x-2 mb-2;
+  }
+  
+  /* Instagram-like comment input */
+  .comment-input {
+    @apply bg-transparent border-none p-2 w-full outline-none placeholder-gray-500 text-sm;
+  }
+  
+  /* Instagram-like grid layout */
+  .profile-grid {
+    @apply grid grid-cols-3 gap-1 md:gap-2;
+  }
+  
+  /* Page transitions */
+  .page-transition-enter {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  
+  .page-transition-enter-active {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    transition: opacity 250ms, transform 250ms;
+  }
+  
+  .page-transition-exit {
+    opacity: 1;
+  }
+  
+  .page-transition-exit-active {
+    opacity: 0;
+    transition: opacity 250ms;
+  }
+}
+
+/* Scrollbar - subtle scrollbar like Instagram */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-[var(--background)];
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-gray-700 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400 dark:bg-gray-600;
+}
+
+/* Custom Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bookOpen {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes heartBeat {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  30% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  45% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-bookOpen {
+  animation: bookOpen 0.5s ease-out forwards;
+}
+
+.animate-heartBeat {
+  animation: heartBeat 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* Spinning loader animation */
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+} 
