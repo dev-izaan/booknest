@@ -220,7 +220,7 @@ export default function OnboardingPage() {
                 max="100"
                 value={readingGoal}
                 onChange={(e) => setReadingGoal(parseInt(e.target.value))}
-                className="w-full h-2 bg-blue-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                className="w-full h-2 bg-blue-100 rounded-lg appearance-none cursor-pointer accent-blue-600 text-black"
               />
               
               <div className="flex justify-between text-xs text-blue-700 mt-1">

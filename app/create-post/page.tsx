@@ -17,13 +17,13 @@ export default function CreatePost() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-
+  
   // Redirect if user is not logged in
   if (!loading && !user) {
-    router.push('/login');
+      router.push('/login');
     return null;
-  }
-
+    }
+    
   const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -31,23 +31,26 @@ export default function CreatePost() {
     setCoverImage(file);
     
     // Create a preview URL
-    const reader = new FileReader();
-    reader.onloadend = () => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
       setCoverPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+      };
+      reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    console.log("Form submission started");
     
     if (!user) {
       setError('You must be logged in to create a post');
+      console.log("Error: User not logged in");
       return;
     }
     
     if (!title || !author || !description || !genre || !coverImage) {
       setError('Please fill out all fields and upload a cover image');
+      console.log("Error: Missing required fields", { title, author, description, genre, coverImage });
       return;
     }
     
@@ -55,43 +58,66 @@ export default function CreatePost() {
     setError('');
     
     try {
+      console.log("Starting image upload");
       // 1. Upload cover image to Firebase Storage
-      const { uploadFile, generateFilePath } = await import('@/lib/services/storage');
-      const filePath = generateFilePath(user.uid, `book-covers/${coverImage.name}`);
-      const imageUrl = await uploadFile(coverImage, filePath);
+      let imageUrl;
       
+      try {
+        const { uploadFile, generateFilePath } = await import('@/lib/services/storage');
+        const filePath = generateFilePath(user.uid, `book-covers/${coverImage.name}`);
+        console.log("Generated file path:", filePath);
+        
+        imageUrl = await uploadFile(coverImage, filePath);
+        console.log("Image uploaded successfully, URL:", imageUrl);
+      } catch (uploadError) {
+        console.error("Error uploading image:", uploadError);
+        // Use a placeholder image if upload fails
+        imageUrl = "https://picsum.photos/400/600"; // Placeholder image
+        setError('Warning: Image upload failed - using placeholder image instead. The book will still be created.');
+      }
+      
+      console.log("Saving book data to Firestore");
       // 2. Save book data to Firestore
-      const { setDocument } = await import('@/lib/services/firestore');
-      const bookId = crypto.randomUUID();
-      
-      await setDocument('books', bookId, {
-        title,
-        author,
-        description,
-        genre,
-        coverUrl: imageUrl,
-        userId: user.uid,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        rating: 0,
-        ratingCount: 0,
-        reviewCount: 0
-      });
-      
-      // 3. Also add to the user's books collection
-      await setDocument(`users/${user.uid}/books`, bookId, {
-        bookId,
-        status: 'shared',
-        addedAt: new Date().toISOString()
-      });
-      
-      // 4. Redirect to the book page
-      router.push(`/book/${bookId}`);
+      try {
+        const { setDocument } = await import('@/lib/services/firestore');
+        const bookId = crypto.randomUUID();
+        console.log("Generated book ID:", bookId);
+        
+        await setDocument('books', bookId, {
+          title,
+          author,
+          description,
+          genre,
+          coverUrl: imageUrl,
+          userId: user.uid,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          rating: 0,
+          ratingCount: 0,
+          reviewCount: 0
+        });
+        console.log("Book data saved to Firestore");
+        
+        // 3. Also add to the user's books collection
+        await setDocument(`users/${user.uid}/books`, bookId, {
+          bookId,
+          status: 'shared',
+          addedAt: new Date().toISOString()
+        });
+        console.log("Book reference added to user's books collection");
+        
+        // 4. Redirect to the book page
+        console.log("Redirecting to book page:", `/book/${bookId}`);
+        router.push(`/book/${bookId}`);
+      } catch (firestoreError) {
+        console.error("Error saving to Firestore:", firestoreError);
+        setError('Failed to save book data to database. Please ensure you have proper permissions.');
+        setIsSubmitting(false);
+      }
       
     } catch (err) {
       console.error('Error creating book:', err);
-      setError('Failed to create book. Please try again.');
-    } finally {
+      setError('Failed to create book. Please try again. Error: ' + (err instanceof Error ? err.message : String(err)));
       setIsSubmitting(false);
     }
   };
@@ -103,27 +129,27 @@ export default function CreatePost() {
       {error && (
         <div className="bg-red-50 text-red-600 p-4 rounded-md mb-6">
           {error}
-        </div>
-      )}
-      
+                  </div>
+                )}
+                
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Left side - Cover upload */}
           <div className="col-span-1">
             <div 
               className="aspect-[2/3] border-2 border-dashed border-gray-300 rounded-md flex flex-col items-center justify-center cursor-pointer hover:border-primary-500 transition-colors"
-              onClick={() => fileInputRef.current?.click()}
+                        onClick={() => fileInputRef.current?.click()}
             >
               {coverPreview ? (
                 <div className="w-full h-full relative">
-                  <Image
+                      <Image 
                     src={coverPreview}
                     alt="Cover preview"
-                    fill
-                    style={{ objectFit: 'cover' }}
+                        fill
+                        style={{ objectFit: 'cover' }}
                     className="rounded-md"
                   />
-                  <button
+                  <button 
                     type="button"
                     className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                     onClick={(e) => {
@@ -155,9 +181,9 @@ export default function CreatePost() {
                 className="hidden"
                 accept="image/*"
                 onChange={handleCoverChange}
-              />
-            </div>
-          </div>
+                      />
+                    </div>
+                  </div>
           
           {/* Right side - Book details */}
           <div className="col-span-1 md:col-span-2 space-y-4">
@@ -170,7 +196,7 @@ export default function CreatePost() {
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-black"
                 required
               />
             </div>
@@ -179,12 +205,12 @@ export default function CreatePost() {
               <label htmlFor="author" className="block text-sm font-medium text-gray-700 mb-1">
                 Author <span className="text-red-500">*</span>
               </label>
-              <input
+                <input
                 id="author"
-                type="text"
+                  type="text"
                 value={author}
                 onChange={(e) => setAuthor(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-black"
                 required
               />
             </div>
@@ -197,7 +223,7 @@ export default function CreatePost() {
                 id="genre"
                 value={genre}
                 onChange={(e) => setGenre(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-black"
                 required
               >
                 <option value="">Select genre</option>
@@ -224,7 +250,7 @@ export default function CreatePost() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={6}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-black"
                 required
               ></textarea>
             </div>

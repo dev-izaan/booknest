@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import MobileNavBar from '@/components/MobileNavBar';
@@ -115,25 +115,119 @@ const mockBooks = [
   },
 ];
 
-export default function BookPage({ params }) {
+// Define interface for the processed book data
+interface ProcessedBook {
+  id: string | number;
+  title: string;
+  author: string;
+  cover: string;
+  synopsis: string;
+  publicationDate: string;
+  publisher: string;
+  genres: string[];
+  pages: number | string;
+  isbn: string;
+  rating: number;
+  ratingsCount: number;
+  description: string;
+  reviews: Array<any>;
+  relatedPosts: Array<any>;
+  similarBooks: Array<any>;
+}
+
+// Define type for book data from Firestore
+interface FirestoreBookData {
+  id: string;
+  title: string;
+  author: string;
+  description: string;
+  coverUrl: string;
+  genre?: string;
+  rating?: number;
+  ratingCount?: number;
+  reviewCount?: number;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  publicationDate?: string;
+  publisher?: string;
+  pages?: number;
+  isbn?: string;
+  [key: string]: any; // Allow other properties
+}
+
+export default function BookPage() {
   const router = useRouter();
-  const { id } = params;
-  const [book, setBook] = useState(null);
+  const params = useParams();
+  const id = params?.id as string;
+  
+  const [book, setBook] = useState<ProcessedBook | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('about'); // 'about', 'reviews', 'posts'
   
   useEffect(() => {
-    // In a real app, we would fetch book data based on the ID
-    // For now, we'll use mock data
-    const foundBook = mockBooks.find(b => b.id === parseInt(id));
+    if (!id) return;
     
-    if (foundBook) {
-      setBook(foundBook);
-      setIsLoading(false);
-    } else {
-      // If book not found, redirect to 404 or books list
-      router.push('/books');
-    }
+    const fetchBookData = async () => {
+      try {
+        // First, try to fetch book data from Firestore
+        const { getDocument } = await import('@/lib/services/firestore');
+        const bookData = await getDocument('books', id) as FirestoreBookData | null;
+        
+        if (bookData) {
+          // Convert Firestore data to match our UI expectations
+          const processedBook: ProcessedBook = {
+            id: id,
+            title: bookData.title,
+            author: bookData.author,
+            cover: bookData.coverUrl,
+            synopsis: bookData.description,
+            genres: bookData.genre ? [bookData.genre] : [],
+            rating: bookData.rating || 0,
+            ratingsCount: bookData.ratingCount || 0,
+            description: bookData.description,
+            // Other fields might be undefined but that's ok
+            publicationDate: bookData.publicationDate || 'Unknown',
+            publisher: bookData.publisher || 'Unknown',
+            pages: bookData.pages || 'Unknown',
+            isbn: bookData.isbn || 'Unknown',
+            reviews: [],
+            relatedPosts: [],
+            similarBooks: []
+          };
+          
+          setBook(processedBook);
+          setIsLoading(false);
+          console.log("Found book in Firestore:", processedBook);
+        } 
+        else {
+          // If not found in Firestore, try mock data as fallback
+          console.log("Book not found in Firestore, trying mock data");
+          const foundBook = mockBooks.find(b => b.id === parseInt(id));
+          
+          if (foundBook) {
+            setBook(foundBook as ProcessedBook);
+            setIsLoading(false);
+          } else {
+            // If book not found, redirect to 404 or books list
+            console.log("Book not found in mock data either, redirecting");
+            router.push('/books');
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching book data:", error);
+        setIsLoading(false);
+        // Fall back to mock data on error
+        const foundBook = mockBooks.find(b => b.id === parseInt(id));
+        if (foundBook) {
+          setBook(foundBook as ProcessedBook);
+        } else {
+          router.push('/books');
+        }
+      }
+    };
+    
+    fetchBookData();
   }, [id, router]);
 
   if (isLoading || !book) {
@@ -166,7 +260,7 @@ export default function BookPage({ params }) {
               <p className="text-lg text-gray-600 mt-1">by {book.author}</p>
               
               <div className="flex items-center mt-3">
-                {Array(5).fill().map((_, i) => (
+                {Array(5).fill(0).map((_, i) => (
                   <svg key={i} xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill={i < Math.floor(book.rating) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.5} color={i < Math.floor(book.rating) ? '#FBBF24' : '#D1D5DB'}>
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                   </svg>
@@ -261,24 +355,24 @@ export default function BookPage({ params }) {
             
             <h2 className="text-xl font-bold mt-8">Similar Books</h2>
             <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {book.similarBooks.map((similarBook) => (
-                <Link key={similarBook.id} href={`/book/${similarBook.id}`} className="group">
-                  <div className="relative h-56 shadow-md rounded overflow-hidden group-hover:opacity-90 transition-opacity">
+              {book.similarBooks.map((similarBook, index) => (
+                <Link href={`/book/${similarBook.id}`} key={index} className="block">
+                  <div className="relative h-40 rounded-md overflow-hidden shadow-sm">
                     <Image
                       src={similarBook.cover}
                       alt={similarBook.title}
                       fill
                       style={{ objectFit: 'cover' }}
-                      className="rounded"
                     />
                   </div>
-                  <h3 className="mt-2 text-sm font-medium group-hover:text-blue-600">{similarBook.title}</h3>
-                  <p className="text-xs text-gray-600">{similarBook.author}</p>
+                  <h3 className="mt-2 font-medium text-sm line-clamp-1">{similarBook.title}</h3>
+                  <p className="text-gray-600 text-xs line-clamp-1">{similarBook.author}</p>
                   <div className="flex items-center mt-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                    <span className="text-xs ml-1 text-gray-600">{similarBook.rating}</span>
+                    {Array(5).fill(0).map((_, i) => (
+                      <svg key={i} xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill={i < Math.floor(similarBook.rating || 0) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.5} color={i < Math.floor(similarBook.rating || 0) ? '#FBBF24' : '#D1D5DB'}>
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
                   </div>
                 </Link>
               ))}
@@ -313,7 +407,7 @@ export default function BookPage({ params }) {
                         <span className="text-gray-500 text-sm">{review.date}</span>
                       </div>
                       <div className="flex items-center mt-1">
-                        {Array(5).fill().map((_, i) => (
+                        {Array(5).fill(0).map((_, i) => (
                           <svg key={i} xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill={i < review.rating ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.5} color={i < review.rating ? '#FBBF24' : '#D1D5DB'}>
                             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>

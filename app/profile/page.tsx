@@ -255,7 +255,7 @@ export default function ProfilePage() {
                     <textarea
                       value={newBio}
                       onChange={(e) => setNewBio(e.target.value)}
-                      className="w-full p-2 border rounded-md focus:ring-primary-500 focus:border-primary-500"
+                      className="w-full p-2 border rounded-md focus:ring-primary-500 focus:border-primary-500 text-black"
                       rows={3}
                       placeholder="Tell us about yourself..."
                     />

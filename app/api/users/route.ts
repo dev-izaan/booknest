@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 
+// Add force-static directive to make this compatible with static exports
+export const dynamic = 'force-static';
+
 // Mock users (this would come from a database in a real app)
 const mockUsers = [
   {

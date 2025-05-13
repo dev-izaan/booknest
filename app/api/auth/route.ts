@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
+// Add force-static directive to make this compatible with static exports
+export const dynamic = 'force-static';
+
 // Mock users for authentication
 const mockUsers = {
   'user@example.com': {

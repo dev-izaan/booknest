@@ -1,107 +1,84 @@
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit,
-  DocumentData,
-  QueryConstraint
-} from 'firebase/firestore';
-import app from '../firebase';
+// Import the functions you need from the SDKs you need
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, orderBy, limit } from 'firebase/firestore';
+import { db } from '../firebase';
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
-// Initialize Firestore
-const db = getFirestore(app);
-
-// Get a document by ID from a collection
-export const getDocumentById = async (collectionName: string, docId: string) => {
-  try {
-    const docRef = doc(db, collectionName, docId);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() };
-    } else {
-      return null;
-    }
-  } catch (error) {
-    throw error;
+// Get a document from a collection
+export const getDocument = async (collectionName: string, documentId: string) => {
+  const docRef = doc(db, collectionName, documentId);
+  const docSnap = await getDoc(docRef);
+  
+  if (docSnap.exists()) {
+    return { id: docSnap.id, ...docSnap.data() };
+  } else {
+    return null;
   }
+};
+
+// Alias for getDocument for backward compatibility
+export const getDocumentById = async (collectionName: string, documentId: string) => {
+  return getDocument(collectionName, documentId);
+};
+
+// Set a document in a collection
+export const setDocument = async (collectionName: string, documentId: string, data: any) => {
+  const docRef = doc(db, collectionName, documentId);
+  await setDoc(docRef, data);
+  return documentId;
+};
+
+// Update a document in a collection
+export const updateDocument = async (collectionName: string, documentId: string, data: any) => {
+  const docRef = doc(db, collectionName, documentId);
+  await updateDoc(docRef, data);
+  return documentId;
+};
+
+// Delete a document from a collection
+export const deleteDocument = async (collectionName: string, documentId: string) => {
+  const docRef = doc(db, collectionName, documentId);
+  await deleteDoc(docRef);
+  return documentId;
 };
 
 // Get all documents from a collection
 export const getCollection = async (collectionName: string) => {
-  try {
-    const querySnapshot = await getDocs(collection(db, collectionName));
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    throw error;
-  }
+  const querySnapshot = await getDocs(collection(db, collectionName));
+  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 };
 
-// Query documents from a collection with filters
-export const queryDocuments = async (
+// Query a collection
+export const queryCollection = async (
   collectionName: string, 
-  constraints: QueryConstraint[]
+  conditions: Array<{ field: string, operator: any, value: any }>,
+  sortBy?: { field: string, direction: 'asc' | 'desc' },
+  limitTo?: number
 ) => {
-  try {
-    const collectionRef = collection(db, collectionName);
-    const q = query(collectionRef, ...constraints);
-    const querySnapshot = await getDocs(q);
-    
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    throw error;
+  const collectionRef = collection(db, collectionName);
+  
+  // Build the query
+  let q = query(collectionRef);
+  
+  // Add where conditions
+  if (conditions && conditions.length > 0) {
+    conditions.forEach(condition => {
+      q = query(q, where(condition.field, condition.operator, condition.value));
+    });
   }
+  
+  // Add sorting
+  if (sortBy) {
+    q = query(q, orderBy(sortBy.field, sortBy.direction));
+  }
+  
+  // Add limit
+  if (limitTo) {
+    q = query(q, limit(limitTo));
+  }
+  
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 };
 
-// Create or update a document
-export const setDocument = async (
-  collectionName: string, 
-  docId: string, 
-  data: DocumentData, 
-  merge = true
-) => {
-  try {
-    const docRef = doc(db, collectionName, docId);
-    await setDoc(docRef, data, { merge });
-    return docId;
-  } catch (error) {
-    throw error;
-  }
-};
-
-// Update fields in a document
-export const updateDocument = async (
-  collectionName: string, 
-  docId: string, 
-  data: DocumentData
-) => {
-  try {
-    const docRef = doc(db, collectionName, docId);
-    await updateDoc(docRef, data);
-    return docId;
-  } catch (error) {
-    throw error;
-  }
-};
-
-// Delete a document
-export const deleteDocument = async (collectionName: string, docId: string) => {
-  try {
-    const docRef = doc(db, collectionName, docId);
-    await deleteDoc(docRef);
-    return true;
-  } catch (error) {
-    throw error;
-  }
-};
-
-export { db, collection, doc, query, where, orderBy, limit };
-export default db; 
+export default db;

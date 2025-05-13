@@ -3,7 +3,27 @@ import { NextResponse } from 'next/server';
 // Import the mock data
 import { mockMessages, mockConversations } from './service';
 
+// Add force-static directive to make this compatible with static exports
+export const dynamic = 'force-static';
+
+// Check if we're in a browser environment
+const isBrowser = typeof window !== 'undefined';
+
 export async function GET(request: Request) {
+  // If we're in a static export (browser), return a mock response
+  if (isBrowser) {
+    return new Response(
+      JSON.stringify({ 
+        message: 'This API route is not available in static exports',
+        mockData: true 
+      }),
+      { 
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const conversationId = searchParams.get('conversationId');
   
@@ -29,6 +49,20 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  // If we're in a static export (browser), return a mock response
+  if (isBrowser) {
+    return new Response(
+      JSON.stringify({ 
+        message: 'This API route is not available in static exports',
+        mockData: true 
+      }),
+      { 
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
   try {
     const { conversationId, message } = await request.json();
     
@@ -72,6 +106,20 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  // If we're in a static export (browser), return a mock response
+  if (isBrowser) {
+    return new Response(
+      JSON.stringify({ 
+        message: 'This API route is not available in static exports',
+        mockData: true 
+      }),
+      { 
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
   try {
     const { conversationId } = await request.json();
     
