@@ -1,56 +1,89 @@
 'use client';
 
-import { useState, useRef, FormEvent } from 'react';
+import { useState, useRef, FormEvent, ChangeEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useFirebase } from '@/contexts/FirebaseContext';
 import Image from 'next/image';
+import { PostsService, type Post } from '@/lib/services/local-storage-service';
+import { uploadImage, generatePlaceholderImage } from '@/lib/services/image-service';
 
 export default function CreatePost() {
   const router = useRouter();
-  const { user, loading } = useFirebase();
-  const [title, setTitle] = useState('');
-  const [author, setAuthor] = useState('');
-  const [description, setDescription] = useState('');
-  const [genre, setGenre] = useState('');
-  const [coverImage, setCoverImage] = useState<File | null>(null);
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [content, setContent] = useState('');
+  const [image, setImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [bookTitle, setBookTitle] = useState('');
+  const [bookAuthor, setBookAuthor] = useState('');
+  const [bookCover, setBookCover] = useState<File | null>(null);
+  const [bookCoverPreview, setBookCoverPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: string; username: string; avatar?: string } | null>(null);
   
-  // Redirect if user is not logged in
-  if (!loading && !user) {
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const bookCoverInputRef = useRef<HTMLInputElement>(null);
+
+  // Check for authentication
+  useEffect(() => {
+    const userString = localStorage.getItem('bookTok_currentUser');
+    if (!userString) {
       router.push('/login');
-    return null;
+      return;
     }
     
-  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const user = JSON.parse(userString);
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      router.push('/login');
+    }
+  }, [router]);
+
+  const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setCoverImage(file);
+    setImage(file);
     
     // Create a preview URL
-      const reader = new FileReader();
-      reader.onloadend = () => {
-      setCoverPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleBookCoverChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBookCover(file);
+    
+    // Create a preview URL
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setBookCoverPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log("Form submission started");
     
-    if (!user) {
+    if (!currentUser) {
       setError('You must be logged in to create a post');
-      console.log("Error: User not logged in");
       return;
     }
     
-    if (!title || !author || !description || !genre || !coverImage) {
-      setError('Please fill out all fields and upload a cover image');
-      console.log("Error: Missing required fields", { title, author, description, genre, coverImage });
+    // Validate post content
+    if (!content) {
+      setError('Please enter some text for your post');
+      return;
+    }
+    
+    // If book information is provided, both title and author are required
+    if ((bookTitle && !bookAuthor) || (!bookTitle && bookAuthor)) {
+      setError('Please provide both book title and author');
       return;
     }
     
@@ -58,106 +91,106 @@ export default function CreatePost() {
     setError('');
     
     try {
-      console.log("Starting image upload");
-      // 1. Upload cover image to Firebase Storage
       let imageUrl;
+      let bookCoverUrl;
       
-      try {
-        const { uploadFile, generateFilePath } = await import('@/lib/services/storage');
-        const filePath = generateFilePath(user.uid, `book-covers/${coverImage.name}`);
-        console.log("Generated file path:", filePath);
-        
-        imageUrl = await uploadFile(coverImage, filePath);
-        console.log("Image uploaded successfully, URL:", imageUrl);
-      } catch (uploadError) {
-        console.error("Error uploading image:", uploadError);
-        // Use a placeholder image if upload fails
-        imageUrl = "https://picsum.photos/400/600"; // Placeholder image
-        setError('Warning: Image upload failed - using placeholder image instead. The book will still be created.');
+      // Upload image if provided
+      if (image) {
+        imageUrl = await uploadImage(image);
       }
       
-      console.log("Saving book data to Firestore");
-      // 2. Save book data to Firestore
-      try {
-        const { setDocument } = await import('@/lib/services/firestore');
-        const bookId = crypto.randomUUID();
-        console.log("Generated book ID:", bookId);
-        
-        await setDocument('books', bookId, {
-          title,
-          author,
-          description,
-          genre,
-          coverUrl: imageUrl,
-          userId: user.uid,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          rating: 0,
-          ratingCount: 0,
-          reviewCount: 0
-        });
-        console.log("Book data saved to Firestore");
-        
-        // 3. Also add to the user's books collection
-        await setDocument(`users/${user.uid}/books`, bookId, {
-          bookId,
-          status: 'shared',
-          addedAt: new Date().toISOString()
-        });
-        console.log("Book reference added to user's books collection");
-        
-        // 4. Redirect to the book page
-        console.log("Redirecting to book page:", `/book/${bookId}`);
-        router.push(`/book/${bookId}`);
-      } catch (firestoreError) {
-        console.error("Error saving to Firestore:", firestoreError);
-        setError('Failed to save book data to database. Please ensure you have proper permissions.');
-        setIsSubmitting(false);
+      // Upload book cover if provided
+      if (bookCover) {
+        bookCoverUrl = await uploadImage(bookCover);
       }
       
-    } catch (err) {
-      console.error('Error creating book:', err);
-      setError('Failed to create book. Please try again. Error: ' + (err instanceof Error ? err.message : String(err)));
+      // Create the post object
+      const postData: Omit<Post, 'id' | 'likes' | 'comments' | 'timestamp' | 'likedBy'> = {
+        userId: currentUser.id,
+        username: currentUser.username,
+        userAvatar: currentUser.avatar || generatePlaceholderImage(currentUser.username, 64, 64),
+        content,
+        imageUrl: imageUrl || undefined,
+        bookTitle: bookTitle || undefined,
+        bookAuthor: bookAuthor || undefined,
+        bookCover: bookCoverUrl || undefined,
+      };
+      
+      // Save post
+      const newPost = PostsService.createPost(postData);
+      
+      // Navigate back to feed
+      router.push('/feed');
+      
+    } catch (error) {
+      console.error('Error creating post:', error);
+      setError('Failed to create post. Please try again.');
+    } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="container mx-auto px-4 py-12 max-w-4xl">
-      <h1 className="text-3xl font-serif font-bold mb-8">Share a Book</h1>
-      
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-md mb-6">
-          {error}
-                  </div>
-                )}
-                
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Left side - Cover upload */}
-          <div className="col-span-1">
+    <div className="bg-[var(--background)] min-h-screen pb-20">
+      <div className="max-w-lg mx-auto px-4 py-8">
+        <div className="flex items-center mb-6">
+          <button 
+            onClick={() => router.back()}
+            className="mr-4 text-[var(--text-secondary)]"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+          </button>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Create Post</h1>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-lg mb-6">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          {/* Post Content */}
+          <div className="mb-6">
+            <label htmlFor="post-content" className="block mb-2 text-[var(--text-primary)] font-medium">What's on your mind?</label>
+            <textarea
+              id="post-content"
+              rows={4}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="w-full px-4 py-2 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+              placeholder="Share your thoughts about a book you're reading..."
+              required
+            />
+          </div>
+
+          {/* Post Image */}
+          <div className="mb-6">
+            <label className="block mb-2 text-[var(--text-primary)] font-medium">Add Image (optional)</label>
             <div 
-              className="aspect-[2/3] border-2 border-dashed border-gray-300 rounded-md flex flex-col items-center justify-center cursor-pointer hover:border-primary-500 transition-colors"
-                        onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-[var(--card-border)] rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:border-[var(--accent-color)] transition-colors"
+              onClick={() => imageInputRef.current?.click()}
             >
-              {coverPreview ? (
-                <div className="w-full h-full relative">
-                      <Image 
-                    src={coverPreview}
-                    alt="Cover preview"
-                        fill
-                        style={{ objectFit: 'cover' }}
-                    className="rounded-md"
+              {imagePreview ? (
+                <div className="relative w-full">
+                  <Image 
+                    src={imagePreview}
+                    alt="Image preview"
+                    width={500}
+                    height={300}
+                    className="w-full h-auto max-h-64 object-contain rounded-md"
                   />
                   <button 
                     type="button"
                     className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setCoverImage(null);
-                      setCoverPreview(null);
-                      if (fileInputRef.current) {
-                        fileInputRef.current.value = '';
+                      setImage(null);
+                      setImagePreview(null);
+                      if (imageInputRef.current) {
+                        imageInputRef.current.value = '';
                       }
                     }}
                   >
@@ -168,112 +201,131 @@ export default function CreatePost() {
                 </div>
               ) : (
                 <>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-[var(--text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <p className="mt-2 text-sm text-gray-500">Upload cover image</p>
-                  <p className="text-xs text-gray-400 mt-1">JPG, PNG or GIF</p>
+                  <p className="mt-2 text-sm text-[var(--text-secondary)]">Click to upload an image</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-1">JPG, PNG or GIF</p>
                 </>
               )}
               <input
                 type="file"
-                ref={fileInputRef}
+                ref={imageInputRef}
                 className="hidden"
                 accept="image/*"
-                onChange={handleCoverChange}
-                      />
-                    </div>
-                  </div>
-          
-          {/* Right side - Book details */}
-          <div className="col-span-1 md:col-span-2 space-y-4">
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-                Book Title <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="title"
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-black"
-                required
+                onChange={handleImageChange}
               />
-            </div>
-            
-            <div>
-              <label htmlFor="author" className="block text-sm font-medium text-gray-700 mb-1">
-                Author <span className="text-red-500">*</span>
-              </label>
-                <input
-                id="author"
-                  type="text"
-                value={author}
-                onChange={(e) => setAuthor(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-black"
-                required
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="genre" className="block text-sm font-medium text-gray-700 mb-1">
-                Genre <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="genre"
-                value={genre}
-                onChange={(e) => setGenre(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-black"
-                required
-              >
-                <option value="">Select genre</option>
-                <option value="fantasy">Fantasy</option>
-                <option value="science-fiction">Science Fiction</option>
-                <option value="mystery">Mystery</option>
-                <option value="thriller">Thriller</option>
-                <option value="romance">Romance</option>
-                <option value="non-fiction">Non-Fiction</option>
-                <option value="biography">Biography</option>
-                <option value="history">History</option>
-                <option value="self-help">Self-Help</option>
-                <option value="young-adult">Young Adult</option>
-                <option value="children">Children's</option>
-              </select>
-            </div>
-            
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                Description <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={6}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-black"
-                required
-              ></textarea>
             </div>
           </div>
-        </div>
-        
-        <div className="flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
-          >
-            {isSubmitting ? 'Submitting...' : 'Share Book'}
-          </button>
-        </div>
-      </form>
+
+          {/* Book Details Section */}
+          <div className="mb-6 p-4 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg">
+            <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Add Book Details (optional)</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Book Cover */}
+              <div className="md:col-span-1">
+                <label className="block mb-2 text-sm text-[var(--text-primary)]">Book Cover</label>
+                <div 
+                  className="aspect-[2/3] border-2 border-dashed border-[var(--card-border)] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[var(--accent-color)] transition-colors"
+                  onClick={() => bookCoverInputRef.current?.click()}
+                >
+                  {bookCoverPreview ? (
+                    <div className="w-full h-full relative">
+                      <Image 
+                        src={bookCoverPreview}
+                        alt="Book cover preview"
+                        fill
+                        style={{ objectFit: 'cover' }}
+                        className="rounded-md"
+                      />
+                      <button 
+                        type="button"
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setBookCover(null);
+                          setBookCoverPreview(null);
+                          if (bookCoverInputRef.current) {
+                            bookCoverInputRef.current.value = '';
+                          }
+                        }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-[var(--text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                      <p className="mt-2 text-xs text-[var(--text-secondary)]">Upload cover</p>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    ref={bookCoverInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleBookCoverChange}
+                  />
+                </div>
+              </div>
+              
+              {/* Book Info */}
+              <div className="md:col-span-2 space-y-4">
+                <div>
+                  <label htmlFor="book-title" className="block mb-1 text-sm text-[var(--text-primary)]">
+                    Book Title
+                  </label>
+                  <input
+                    id="book-title"
+                    type="text"
+                    value={bookTitle}
+                    onChange={(e) => setBookTitle(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--card-border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                    placeholder="Enter book title"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="book-author" className="block mb-1 text-sm text-[var(--text-primary)]">
+                    Author
+                  </label>
+                  <input
+                    id="book-author"
+                    type="text"
+                    value={bookAuthor}
+                    onChange={(e) => setBookAuthor(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--card-border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                    placeholder="Enter author name"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="px-4 py-2 border border-[var(--card-border)] rounded-md text-[var(--text-primary)] bg-[var(--card-bg)] hover:bg-[var(--background)] focus:outline-none transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-[var(--accent-color)] text-white rounded-md hover:bg-opacity-90 focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? 'Creating...' : 'Share Post'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 } 

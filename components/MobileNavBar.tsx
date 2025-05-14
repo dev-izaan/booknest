@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
 export default function MobileNavBar({ activePage = '' }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [visible, setVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   
@@ -36,6 +38,17 @@ export default function MobileNavBar({ activePage = '' }) {
       return activePage === path;
     }
     return pathname === path || pathname?.startsWith(`/${path}`);
+  };
+  
+  const handleLogout = () => {
+    // Clear user from localStorage
+    localStorage.removeItem('bookTok_currentUser');
+    
+    // Redirect to login page
+    router.push('/login');
+    
+    // Close modal
+    setLogoutModalOpen(false);
   };
   
   return (
@@ -74,12 +87,15 @@ export default function MobileNavBar({ activePage = '' }) {
         <span className="text-xs mt-1">Messages</span>
       </Link>
       
-      <Link href="/profile" className={`mobile-nav-item ${isActive('profile') ? 'text-[var(--accent-color)]' : ''}`}>
+      <button 
+        onClick={() => setLogoutModalOpen(true)} 
+        className={`mobile-nav-item ${isActive('profile') ? 'text-[var(--accent-color)]' : ''}`}
+      >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
         <span className="text-xs mt-1">Profile</span>
-      </Link>
+      </button>
 
       {createModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center p-4 animate-fadeIn">
@@ -153,6 +169,32 @@ export default function MobileNavBar({ activePage = '' }) {
                   <p className="text-sm text-[var(--primary-dark)]">Curate a collection of books</p>
                 </div>
               </Link>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {logoutModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-[var(--card-bg)] rounded-lg w-full max-w-sm p-6 animate-bookOpen">
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-bold mb-2">Sign Out</h3>
+              <p className="text-[var(--text-secondary)]">Are you sure you want to sign out?</p>
+            </div>
+            
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setLogoutModalOpen(false)}
+                className="flex-1 py-2 px-4 border border-[var(--card-border)] rounded-md text-[var(--text-primary)] bg-[var(--card-bg)] hover:bg-[var(--background)] focus:outline-none transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex-1 py-2 px-4 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none transition-colors"
+              >
+                Sign Out
+              </button>
             </div>
           </div>
         </div>

@@ -3,11 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useFirebase } from '@/contexts/FirebaseContext';
+import { generatePlaceholderImage } from '@/lib/services/image-service';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { user } = useFirebase();
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -15,16 +14,14 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true);
-    
-    // If user is already logged in, redirect to dashboard
+    // Check if already logged in
+    const user = localStorage.getItem('bookTok_currentUser');
     if (user) {
-      router.push('/dashboard');
+      router.push('/feed');
     }
-  }, [user, router]);
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,49 +38,73 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!username.match(/^[a-zA-Z0-9_]+$/)) {
+      setError('Username can only contain letters, numbers, and underscores');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Register user with Firebase
-      const { registerWithEmailAndPassword } = await import('@/lib/services/firebase-auth');
-      const newUser = await registerWithEmailAndPassword(email, password);
+      // Get existing users from localStorage or initialize empty array
+      const usersString = localStorage.getItem('bookTok_users');
+      const users = usersString ? JSON.parse(usersString) : [];
       
-      // Store additional user data in Firestore
-      if (newUser) {
-        const { setDocument } = await import('@/lib/services/firestore');
-        await setDocument('users', newUser.uid, {
-          name,
-          email,
-          username,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          photoURL: '',
-          bio: '',
-          following: [],
-          followers: [],
-          booksRead: 0,
-          reviewsPosted: 0
-        });
+      // Check if email is already in use
+      if (users.some((user: any) => user.email === email)) {
+        setError('Email is already in use. Please try another email.');
+        setIsLoading(false);
+        return;
       }
       
-      // Redirect to onboarding
-      router.push('/onboarding');
+      // Check if username is already taken
+      if (users.some((user: any) => user.username === username)) {
+        setError('Username is already taken. Please choose another username.');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Generate avatar placeholder
+      const avatar = generatePlaceholderImage(username, 100, 100);
+      
+      // Create new user
+      const userId = `user_${Date.now()}`;
+      const newUser = {
+        id: userId,
+        name,
+        email,
+        username,
+        password, // Note: In a real app, this would be securely hashed
+        avatar,
+        createdAt: new Date().toISOString(),
+        bio: '',
+        following: [],
+        followers: [],
+        booksRead: 0,
+        reviewsPosted: 0
+      };
+      
+      // Add to users array
+      users.push(newUser);
+      
+      // Save to localStorage
+      localStorage.setItem('bookTok_users', JSON.stringify(users));
+      
+      // Create current user object (omitting password)
+      const currentUser = {
+        id: userId,
+        username,
+        email,
+        avatar
+      };
+      
+      // Set as current user
+      localStorage.setItem('bookTok_currentUser', JSON.stringify(currentUser));
+      
+      // Redirect to feed page
+      router.push('/feed');
     } catch (err: any) {
-      // Handle Firebase auth errors
-      let errorMessage = 'An error occurred during registration. Please try again.';
-      
-      // Provide more specific error messages based on Firebase error codes
-      if (err.code === 'auth/email-already-in-use') {
-        errorMessage = 'Email is already in use. Please try another email.';
-      } else if (err.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address.';
-      } else if (err.code === 'auth/weak-password') {
-        errorMessage = 'Password is too weak. Please choose a stronger password.';
-      } else if (err.code === 'auth/network-request-failed') {
-        errorMessage = 'Network error. Please check your internet connection.';
-      }
-      
-      setError(errorMessage);
+      setError('An unexpected error occurred. Please try again.');
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -91,22 +112,22 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--background)] py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-bold text-[var(--text-primary)]">
             Create your account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-sm text-[var(--text-secondary)]">
             Already have an account?{' '}
-            <Link href="/login" className="font-medium text-primary-600 hover:text-primary-500">
+            <Link href="/login" className="font-medium text-[var(--accent-color)] hover:text-[var(--accent-color)]/90">
               Sign in
             </Link>
           </p>
         </div>
         
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4">
+          <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 p-4">
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -114,7 +135,7 @@ export default function RegisterPage() {
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
+                <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
               </div>
             </div>
           </div>
@@ -123,7 +144,7 @@ export default function RegisterPage() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm space-y-4">
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="name" className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                 Full Name
               </label>
               <input
@@ -131,7 +152,7 @@ export default function RegisterPage() {
                 name="name"
                 type="text"
                 required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-3 py-2 border border-[var(--card-border)] rounded-md bg-[var(--card-bg)] placeholder-[var(--text-secondary)] text-[var(--text-primary)] focus:outline-none focus:ring-[var(--accent-color)] focus:border-[var(--accent-color)] focus:z-10 sm:text-sm"
                 placeholder="John Doe"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -139,7 +160,7 @@ export default function RegisterPage() {
             </div>
             
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="username" className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                 Username
               </label>
               <input
@@ -147,7 +168,7 @@ export default function RegisterPage() {
                 name="username"
                 type="text"
                 required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-3 py-2 border border-[var(--card-border)] rounded-md bg-[var(--card-bg)] placeholder-[var(--text-secondary)] text-[var(--text-primary)] focus:outline-none focus:ring-[var(--accent-color)] focus:border-[var(--accent-color)] focus:z-10 sm:text-sm"
                 placeholder="johndoe"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -155,7 +176,7 @@ export default function RegisterPage() {
             </div>
             
             <div>
-              <label htmlFor="email-address" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="email-address" className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                 Email address
               </label>
               <input
@@ -164,7 +185,7 @@ export default function RegisterPage() {
                 type="email"
                 autoComplete="email"
                 required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-3 py-2 border border-[var(--card-border)] rounded-md bg-[var(--card-bg)] placeholder-[var(--text-secondary)] text-[var(--text-primary)] focus:outline-none focus:ring-[var(--accent-color)] focus:border-[var(--accent-color)] focus:z-10 sm:text-sm"
                 placeholder="john@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -172,7 +193,7 @@ export default function RegisterPage() {
             </div>
             
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="password" className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                 Password
               </label>
               <input
@@ -181,7 +202,7 @@ export default function RegisterPage() {
                 type="password"
                 autoComplete="new-password"
                 required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-3 py-2 border border-[var(--card-border)] rounded-md bg-[var(--card-bg)] placeholder-[var(--text-secondary)] text-[var(--text-primary)] focus:outline-none focus:ring-[var(--accent-color)] focus:border-[var(--accent-color)] focus:z-10 sm:text-sm"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -189,7 +210,7 @@ export default function RegisterPage() {
             </div>
             
             <div>
-              <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="confirm-password" className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                 Confirm Password
               </label>
               <input
@@ -198,7 +219,7 @@ export default function RegisterPage() {
                 type="password"
                 autoComplete="new-password"
                 required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-3 py-2 border border-[var(--card-border)] rounded-md bg-[var(--card-bg)] placeholder-[var(--text-secondary)] text-[var(--text-primary)] focus:outline-none focus:ring-[var(--accent-color)] focus:border-[var(--accent-color)] focus:z-10 sm:text-sm"
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -210,19 +231,19 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[var(--accent-color)] hover:bg-[var(--accent-color)]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)] disabled:opacity-50"
             >
               {isLoading ? 'Creating Account...' : 'Create Account'}
             </button>
           </div>
           
-          <div className="text-sm text-center">
+          <div className="text-sm text-center text-[var(--text-secondary)]">
             By signing up, you agree to our{' '}
-            <Link href="/terms" className="font-medium text-primary-600 hover:text-primary-500">
+            <Link href="/terms" className="font-medium text-[var(--accent-color)] hover:text-[var(--accent-color)]/90">
               Terms of Service
             </Link>{' '}
             and{' '}
-            <Link href="/privacy" className="font-medium text-primary-600 hover:text-primary-500">
+            <Link href="/privacy" className="font-medium text-[var(--accent-color)] hover:text-[var(--accent-color)]/90">
               Privacy Policy
             </Link>
           </div>
